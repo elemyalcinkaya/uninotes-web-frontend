@@ -1,5 +1,4 @@
-
-import { Upload, BookOpen, FileText, Home, User } from "lucide-react";
+import { Upload, BookOpen, FileText, Home, User, LogOut } from "lucide-react";
 import { Routes, Route, useNavigate, Outlet } from "react-router-dom";
 
 import logo from "../assets/last-logo.png";
@@ -7,6 +6,10 @@ import About from "./About";
 import SharedNotes from "./SharedNotes";
 import AddNotes from "./AddNotes";
 import Profil from "./Profil";
+import Login from "./Login";
+import Register from "./Register";
+import ProtectedRoute from "./ProtectedRoute";
+import { useAuth } from "../hooks/useAuth";
 
 function NavLink({ icon: Icon, label, to }: { icon: any; label: string; to: string }) {
   const navigate = useNavigate();
@@ -94,10 +97,28 @@ function HomePage() {
 
 function Layout() {
   const navigate = useNavigate();
+  const { isAuthenticated, logout, loading } = useAuth();
 
   const handleLogoClick = () => {
     navigate("/");
   };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  // Loading state - show minimal UI while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -105,15 +126,40 @@ function Layout() {
       <header className="sticky top-0 z-10 bg-purple-700 text-white">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
           <button onClick={handleLogoClick} className="cursor-pointer hover:opacity-80 transition">
-            
             <img src={logo} alt="UniNotes Logo" className="h-11 md:h-12 w-auto" />
-
           </button>
           <nav className="hidden md:flex items-center gap-2">
             <NavLink icon={Home} label="About" to="/about" />
-            <NavLink icon={FileText} label="Shared Notes" to="/shared-notes" />
-            <NavLink icon={Upload} label="Add Note" to="/add-notes" />
-            <NavLink icon={User} label="Profile" to="/profile" />
+            {isAuthenticated && (
+              <>
+                <NavLink icon={FileText} label="Shared Notes" to="/shared-notes" />
+                <NavLink icon={Upload} label="Add Note" to="/add-notes" />
+                <NavLink icon={User} label="Profile" to="/profile" />
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 transition"
+                >
+                  <LogOut size={18} />
+                  <span className="font-medium">Logout</span>
+                </button>
+              </>
+            )}
+            {!isAuthenticated && (
+              <>
+                <button
+                  onClick={() => navigate("/login")}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 transition"
+                >
+                  <span className="font-medium">Login</span>
+                </button>
+                <button
+                  onClick={() => navigate("/register")}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 transition"
+                >
+                  <span className="font-medium">Register</span>
+                </button>
+              </>
+            )}
           </nav>
         </div>
       </header>
@@ -129,9 +175,32 @@ export default function App() {
       <Route path="/" element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="about" element={<About />} />
-        <Route path="shared-notes" element={<SharedNotes />} />
-        <Route path="add-notes" element={<AddNotes />} />
-        <Route path="profile" element={<Profil />} />
+        <Route path="login" element={<Login />} />
+        <Route path="register" element={<Register />} />
+        <Route
+          path="shared-notes"
+          element={
+            <ProtectedRoute>
+              <SharedNotes />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="add-notes"
+          element={
+            <ProtectedRoute>
+              <AddNotes />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="profile"
+          element={
+            <ProtectedRoute>
+              <Profil />
+            </ProtectedRoute>
+          }
+        />
       </Route>
     </Routes>
   );

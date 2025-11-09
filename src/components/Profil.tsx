@@ -1,22 +1,37 @@
-import { Mail, User, Calendar, FileText, Upload, Edit2, Camera } from "lucide-react";
-import { useState } from "react";
+import { Mail, User, Calendar, FileText, Upload, Edit2, Camera, Loader } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useAuth } from "../hooks/useAuth";
+import { apiService, Note } from "../services/apiService";
 
 export default function Profile() {
-  // Kullanıcı bilgileri state'leri
+  const { user, logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [username, setUsername] = useState("Elem Yalçınkaya");
-  const [email, setEmail] = useState("elem.yalcinkaya@universite.edu.tr");
-  const [joinDate] = useState("Ocak 2024");
+  const [username, setUsername] = useState(user?.name || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [uploadedNotes, setUploadedNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
   const [profileImage, setProfileImage] = useState("");
 
-  // Kullanıcının yüklediği notlar (örnek veri)
-  const uploadedNotes = [
-    { id: 1, title: "Introduction to Programming", courseCode: "CS 101", uploadDate: "2024-01-15" },
-    { id: 2, title: "Data Structures", courseCode: "CS 102", uploadDate: "2024-02-10" },
-    { id: 3, title: "Database Management", courseCode: "CS 202", uploadDate: "2024-03-05" },
-  ];
+  useEffect(() => {
+    if (user) {
+      setUsername(user.name);
+      setEmail(user.email);
+      loadUserNotes();
+    }
+  }, [user]);
 
-  // Profil fotoğrafı değiştirme
+  const loadUserNotes = async () => {
+    try {
+      setLoading(true);
+      const notes = await apiService.notes.getAll();
+      setUploadedNotes(notes);
+    } catch (err) {
+      console.error("Notlar yüklenirken hata:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -28,12 +43,19 @@ export default function Profile() {
     }
   };
 
-  // Profil bilgilerini kaydetme
-  const handleSave = () => {
+  const handleSave = async () => {
+    // Profil güncelleme API'si yoksa sadece state'i güncelle
     setIsEditing(false);
-    // Burada API'ye kaydetme işlemi yapılabilir
     console.log("Profil güncellendi:", { username, email });
   };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader className="animate-spin text-purple-600" size={48} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -57,11 +79,16 @@ export default function Profile() {
             <div className="bg-white rounded-2xl shadow-lg p-8 text-center sticky top-24">
               {/* Profil Fotoğrafı */}
               <div className="relative inline-block mb-6">
-                <img
-                  src={profileImage}
-                  alt="Profil Fotoğrafı"
-                  className="w-32 h-32 rounded-full border-4 border-purple-200 object-cover"
-                />
+                <div className="w-32 h-32 rounded-full border-4 border-purple-200 bg-purple-100 flex items-center justify-center text-4xl font-bold text-purple-700">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+                {profileImage && (
+                  <img
+                    src={profileImage}
+                    alt="Profil Fotoğrafı"
+                    className="w-32 h-32 rounded-full border-4 border-purple-200 object-cover absolute inset-0"
+                  />
+                )}
                 <label
                   htmlFor="profile-image"
                   className="absolute bottom-0 right-0 bg-purple-600 hover:bg-purple-700 text-white p-2 rounded-full cursor-pointer transition-colors shadow-lg"
@@ -97,7 +124,7 @@ export default function Profile() {
               <div className="border-t border-gray-200 pt-6 mt-6">
                 <div className="flex items-center justify-center gap-2 text-gray-600">
                   <Calendar size={18} />
-                  <span className="text-sm">Katılım: {joinDate}</span>
+                  <span className="text-sm">Kullanıcı ID: {user.id}</span>
                 </div>
               </div>
             </div>
@@ -171,7 +198,11 @@ export default function Profile() {
                       Kaydet
                     </button>
                     <button
-                      onClick={() => setIsEditing(false)}
+                      onClick={() => {
+                        setIsEditing(false);
+                        setUsername(user.name);
+                        setEmail(user.email);
+                      }}
                       className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 rounded-xl transition-colors"
                     >
                       İptal
@@ -191,7 +222,12 @@ export default function Profile() {
                 </div>
               </div>
 
-              {uploadedNotes.length > 0 ? (
+              {loading ? (
+                <div className="text-center py-12">
+                  <Loader className="animate-spin mx-auto text-purple-600 mb-4" size={32} />
+                  <p className="text-gray-500">Yükleniyor...</p>
+                </div>
+              ) : uploadedNotes.length > 0 ? (
                 <div className="space-y-4">
                   {uploadedNotes.map((note) => (
                     <div
@@ -204,11 +240,13 @@ export default function Profile() {
                         </div>
                         <div>
                           <h4 className="font-semibold text-gray-900">{note.title}</h4>
-                          <p className="text-sm text-purple-600">{note.courseCode}</p>
+                          {note.courseCode && (
+                            <p className="text-sm text-purple-600">{note.courseCode}</p>
+                          )}
                         </div>
                       </div>
                       <div className="text-sm text-gray-500">
-                        {new Date(note.uploadDate).toLocaleDateString('tr-TR')}
+                        {new Date(note.createdAt).toLocaleDateString('tr-TR')}
                       </div>
                     </div>
                   ))}

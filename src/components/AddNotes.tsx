@@ -1,22 +1,18 @@
 import { Upload, FileText, X, Check } from "lucide-react";
 import { useState } from "react";
-
-interface NoteFile {
-  id: string;
-  file: File;
-  courseName: string;
-  courseCode: string;
-  description: string;
-}
+import { apiService } from "../services/apiService";
+import { useNavigate } from "react-router-dom";
 
 export default function AddNotes() {
+  const navigate = useNavigate();
   const [dragActive, setDragActive] = useState(false);
-  const [noteFile, setNoteFile] = useState<NoteFile | null>(null);
-  const [courseName, setCourseName] = useState("");
+  const [selectedFile, setSelectedFile] = useState<globalThis.File | null>(null);
+  const [title, setTitle] = useState("");
   const [courseCode, setCourseCode] = useState("");
-  const [description, setDescription] = useState("");
+  const [summary, setSummary] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [error, setError] = useState("");
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -44,55 +40,65 @@ export default function AddNotes() {
     }
   };
 
-  const handleFile = (file: File) => {
-    const newNote: NoteFile = {
-      id: Date.now().toString(),
-      file: file,
-      courseName: "",
-      courseCode: "",
-      description: ""
-    };
-    setNoteFile(newNote);
+  const handleFile = (file: globalThis.File) => {
+    if (file.size > 50 * 1024 * 1024) {
+      setError("Dosya boyutu 50MB'dan büyük olamaz");
+      return;
+    }
+    setSelectedFile(file);
+    setError("");
+    if (!title) {
+      setTitle(file.name.replace(/\.[^/.]+$/, ""));
+    }
   };
 
   const removeFile = () => {
-    setNoteFile(null);
-    setCourseName("");
+    setSelectedFile(null);
+    setTitle("");
     setCourseCode("");
-    setDescription("");
+    setSummary("");
+    setError("");
   };
 
-  const handleUpload = () => {
-    if (!noteFile || !courseName || !courseCode || !description) {
-      alert("Lütfen tüm alanları doldurun!");
+  const handleUpload = async () => {
+    if (!selectedFile || !title) {
+      setError("Lütfen dosya ve başlık alanlarını doldurun!");
       return;
     }
 
     setUploading(true);
-    
-    // Simulated upload
-    setTimeout(() => {
-      console.log("Uploading note:", {
-        file: noteFile.file.name,
-        courseName,
-        courseCode,
-        description
+    setError("");
+
+    try {
+      // Önce notu oluştur
+      const note = await apiService.notes.create({
+        title,
+        courseCode: courseCode || undefined,
+        summary: summary || undefined,
       });
-      setUploading(false);
+
+      // Sonra dosyayı yükle
+      await apiService.files.upload(selectedFile, note.id, selectedFile.name);
+
       setUploadSuccess(true);
       
       // Reset form after 2 seconds
       setTimeout(() => {
-        setNoteFile(null);
-        setCourseName("");
+        setSelectedFile(null);
+        setTitle("");
         setCourseCode("");
-        setDescription("");
+        setSummary("");
         setUploadSuccess(false);
+        navigate("/shared-notes");
       }, 2000);
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message || "Yükleme sırasında bir hata oluştu");
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const isFormValid = noteFile && courseName && courseCode && description;
+  const isFormValid = selectedFile && title;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -135,7 +141,7 @@ export default function AddNotes() {
                 accept=".pdf,.doc,.docx,.ppt,.pptx"
               />
               
-              {!noteFile ? (
+              {!selectedFile ? (
                 <label
                   htmlFor="file-upload"
                   className="flex flex-col items-center justify-center py-12 cursor-pointer"
@@ -165,10 +171,10 @@ export default function AddNotes() {
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">
-                        {noteFile.file.name}
+                        {selectedFile.name}
                       </p>
                       <p className="text-sm text-gray-500">
-                        {(noteFile.file.size / 1024 / 1024).toFixed(2)} MB
+                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                       </p>
                     </div>
                   </div>
@@ -184,22 +190,23 @@ export default function AddNotes() {
           </div>
 
           {/* Form Fields */}
-          {noteFile && (
+          {selectedFile && (
             <div className="space-y-6 mb-8">
-              {/* Course Name */}
+              {/* Note Title */}
               <div>
                 <label
-                  htmlFor="course-name"
+                  htmlFor="title"
                   className="block text-sm font-semibold text-gray-700 mb-2"
                 >
-                  Ders Adı
+                  Not Başlığı <span className="text-red-500">*</span>
                 </label>
                 <input
-                  id="course-name"
+                  id="title"
                   type="text"
-                  value={courseName}
-                  onChange={(e) => setCourseName(e.target.value)}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                   placeholder="Örn: Introduction to Programming"
+                  required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
                 />
               </div>
@@ -210,7 +217,7 @@ export default function AddNotes() {
                   htmlFor="course-code"
                   className="block text-sm font-semibold text-gray-700 mb-2"
                 >
-                  Ders Kodu
+                  Ders Kodu (Opsiyonel)
                 </label>
                 <input
                   id="course-code"
@@ -222,26 +229,32 @@ export default function AddNotes() {
                 />
               </div>
 
-              {/* Description */}
+              {/* Summary */}
               <div>
                 <label
-                  htmlFor="description"
+                  htmlFor="summary"
                   className="block text-sm font-semibold text-gray-700 mb-2"
                 >
-                  Not Açıklaması
+                  Not Özeti (Opsiyonel)
                 </label>
                 <textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  id="summary"
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
                   placeholder="Bu notlar hangi konuları içeriyor? (Örn: Döngüler, diziler, fonksiyonlar)"
                   rows={4}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all resize-none"
                 />
                 <p className="text-xs text-gray-500 mt-2">
-                  {description.length}/500 karakter
+                  {summary.length} karakter
                 </p>
               </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
 
@@ -273,9 +286,9 @@ export default function AddNotes() {
             )}
           </button>
 
-          {!isFormValid && noteFile && (
+          {!isFormValid && selectedFile && (
             <p className="text-sm text-amber-600 text-center mt-4">
-              Lütfen tüm alanları doldurun
+              Lütfen başlık alanını doldurun
             </p>
           )}
         </div>
