@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
 import { Mail, Lock, LogIn } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+//const API_URL = "http://localhost:5276";
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -11,21 +12,20 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate('/');
+      await login(email, password);  // authService.login çağrılıyor
+      navigate('/');                 // giriş başarılı → ana sayfa
     } catch (err: any) {
       setError(err.message || 'Giriş yapılırken bir hata oluştu');
     } finally {
       setLoading(false);
     }
   };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-purple-700 to-purple-800 flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8">
@@ -108,4 +108,5 @@ export default function Login() {
     </div>
   );
 }
+
 

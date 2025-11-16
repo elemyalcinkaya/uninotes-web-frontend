@@ -1,7 +1,20 @@
 import { Mail, User, Calendar, FileText, Upload, Edit2, Camera, Loader } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { apiService, Note } from "../services/apiService";
+import { apiService } from "../services/apiService";
+interface Note {
+  id: number;
+  title: string;
+  courseCode?: string;
+  summary?: string;
+  createdAt: string;
+  fileCount?: number;
+  files?: {
+    id: number;
+    title: string;
+    fileUrl: string;
+  }[];
+}
 
 export default function Profile() {
   const { user, logout } = useAuth();

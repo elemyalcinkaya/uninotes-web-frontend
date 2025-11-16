@@ -9,7 +9,7 @@ import Profil from "./Profil";
 import Login from "./Login";
 import Register from "./Register";
 import ProtectedRoute from "./ProtectedRoute";
-import { useAuth } from "../hooks/useAuth";
+import { AuthProvider, useAuth } from "../hooks/useAuth";
 
 function NavLink({ icon: Icon, label, to }: { icon: any; label: string; to: string }) {
   const navigate = useNavigate();
@@ -97,7 +97,7 @@ function HomePage() {
 
 function Layout() {
   const navigate = useNavigate();
-  const { isAuthenticated, logout, loading } = useAuth();
+  const { user, isAuthenticated, logout, loading } = useAuth();
 
   const handleLogoClick = () => {
     navigate("/");
@@ -105,7 +105,7 @@ function Layout() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   // Loading state - show minimal UI while checking auth
@@ -125,11 +125,21 @@ function Layout() {
       {/* Top bar */}
       <header className="sticky top-0 z-10 bg-purple-700 text-white">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
-          <button onClick={handleLogoClick} className="cursor-pointer hover:opacity-80 transition">
+          <button
+            onClick={handleLogoClick}
+            className="cursor-pointer hover:opacity-80 transition"
+          >
             <img src={logo} alt="UniNotes Logo" className="h-11 md:h-12 w-auto" />
           </button>
-          <nav className="hidden md:flex items-center gap-2">
+          <nav className="hidden md:flex items-center gap-4">
             <NavLink icon={Home} label="About" to="/about" />
+
+            {isAuthenticated && user && (
+              <span className="text-sm mr-2">
+                Hoş geldin, <span className="font-semibold">{user.name}</span>
+              </span>
+            )}
+
             {isAuthenticated && (
               <>
                 <NavLink icon={FileText} label="Shared Notes" to="/shared-notes" />
@@ -144,6 +154,7 @@ function Layout() {
                 </button>
               </>
             )}
+
             {!isAuthenticated && (
               <>
                 <button
@@ -154,7 +165,7 @@ function Layout() {
                 </button>
                 <button
                   onClick={() => navigate("/register")}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 transition"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg:white/20 bg-white/20 hover:bg-white/30 transition"
                 >
                   <span className="font-medium">Register</span>
                 </button>
@@ -171,37 +182,39 @@ function Layout() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<HomePage />} />
-        <Route path="about" element={<About />} />
-        <Route path="login" element={<Login />} />
-        <Route path="register" element={<Register />} />
-        <Route
-          path="shared-notes"
-          element={
-            <ProtectedRoute>
-              <SharedNotes />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="add-notes"
-          element={
-            <ProtectedRoute>
-              <AddNotes />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="profile"
-          element={
-            <ProtectedRoute>
-              <Profil />
-            </ProtectedRoute>
-          }
-        />
-      </Route>
-    </Routes>
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<HomePage />} />
+          <Route path="about" element={<About />} />
+          <Route path="login" element={<Login />} />
+          <Route path="register" element={<Register />} />
+          <Route
+            path="shared-notes"
+            element={
+              <ProtectedRoute>
+                <SharedNotes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="add-notes"
+            element={
+              <ProtectedRoute>
+                <AddNotes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="profile"
+            element={
+              <ProtectedRoute>
+                <Profil />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+      </Routes>
+    </AuthProvider>  
   );
 }

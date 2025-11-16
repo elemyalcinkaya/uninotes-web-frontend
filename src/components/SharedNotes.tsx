@@ -1,6 +1,21 @@
 import { FileText, Download, BookOpen, ChevronRight, Calendar, Loader } from "lucide-react";
 import { useState, useEffect } from "react";
-import { apiService, Note, File } from "../services/apiService";
+import { apiService } from "../services/apiService";
+
+// Burada kendi Note tipimizi tanımlıyoruz
+interface Note {
+  id: number;
+  title: string;
+  courseCode?: string;
+  summary?: string;
+  createdAt: string;
+  fileCount?: number;
+  files?: {
+    id: number;
+    title: string;
+    fileUrl: string;
+  }[];
+}
 
 export default function SharedNotes() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -102,7 +117,7 @@ export default function SharedNotes() {
                   <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
                     <div className="flex items-center gap-1">
                       <Calendar size={14} />
-                      {new Date(note.createdAt).toLocaleDateString('tr-TR')}
+                      {new Date(note.createdAt).toLocaleDateString("tr-TR")}
                     </div>
                     {note.fileCount !== undefined && (
                       <span className="text-purple-600 font-medium">
