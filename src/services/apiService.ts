@@ -1,20 +1,22 @@
-import { getApiUrl, API_ENDPOINTS } from '../config/api';
-import { authService } from './authService';
+import { getApiUrl, API_ENDPOINTS } from "../config/api";
+import { authService } from "./authService";
 
-// API request helper
+/* ===========================
+   API REQUEST HELPER
+=========================== */
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const token = authService.getToken();
 
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...options.headers,
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
   };
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   const response = await fetch(getApiUrl(endpoint), {
@@ -24,31 +26,36 @@ async function apiRequest<T>(
 
   if (!response.ok) {
     if (response.status === 401) {
-      // Unauthorized - logout user
       authService.logout();
-      window.location.href = '/login';
+      window.location.href = "/login";
     }
-    const error = await response.json().catch(() => ({ message: 'An error occurred' }));
+
+    const error = await response
+      .json()
+      .catch(() => ({ message: "An error occurred" }));
+
     throw new Error(error.message || `HTTP error! status: ${response.status}`);
   }
 
   return response.json();
 }
 
-// File upload helper
+/* ===========================
+   FILE UPLOAD HELPER
+=========================== */
 async function apiFileUpload(
   endpoint: string,
   formData: FormData
 ): Promise<any> {
   const token = authService.getToken();
 
-  const headers: HeadersInit = {};
+  const headers: Record<string, string> = {};
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   const response = await fetch(getApiUrl(endpoint), {
-    method: 'POST',
+    method: "POST",
     headers,
     body: formData,
   });
@@ -56,40 +63,57 @@ async function apiFileUpload(
   if (!response.ok) {
     if (response.status === 401) {
       authService.logout();
-      window.location.href = '/login';
+      window.location.href = "/login";
     }
-    const error = await response.json().catch(() => ({ message: 'Upload failed' }));
-    throw new Error(error.message || 'Upload failed');
+
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Upload failed" }));
+
+    throw new Error(error.message || "Upload failed");
   }
 
   return response.json();
 }
 
-// File download helper
-async function downloadFile(fileId: number, fileName: string): Promise<void> {
+/* ===========================
+   FILE DOWNLOAD HELPER
+=========================== */
+async function downloadFile(
+  fileId: number,
+  fileName: string
+): Promise<void> {
   const token = authService.getToken();
-  const response = await fetch(getApiUrl(API_ENDPOINTS.FILES.DOWNLOAD(fileId)), {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+
+  const response = await fetch(
+    getApiUrl(API_ENDPOINTS.FILES.DOWNLOAD(fileId)),
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
   if (!response.ok) {
-    throw new Error('Download failed');
+    throw new Error("Download failed");
   }
 
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
+
+  const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
   document.body.appendChild(a);
   a.click();
+
   window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
 }
 
-// Types
+/* ===========================
+   TYPES
+=========================== */
 export interface Note {
   id: number;
   title: string;
@@ -98,9 +122,16 @@ export interface Note {
   createdAt: string;
   updatedAt: string;
   fileCount?: number;
+
+  sharedBy?: {
+    id: number;
+    name: string;
+    email?: string;
+  };
 }
 
-export interface File {
+/* 🔴 API FILE MODEL – adı değiştirildi */
+export interface NoteFile {
   id: number;
   noteId?: number;
   title: string;
@@ -113,93 +144,118 @@ export interface CreateNoteDto {
   title: string;
   courseCode?: string;
   summary?: string;
+  isShared?: boolean;
 }
 
 export interface UpdateNoteDto {
   title?: string;
   courseCode?: string;
   summary?: string;
+  isShared?: boolean;
 }
 
-// API Service
+/* ===========================
+   API SERVICE
+=========================== */
 export const apiService = {
-  // Notes
+  /* ---------- NOTES ---------- */
   notes: {
-    // Get all notes
     async getAll(): Promise<Note[]> {
       return apiRequest<Note[]>(API_ENDPOINTS.NOTES.LIST);
     },
 
-    // Get note by ID
-    async getById(id: number): Promise<Note & { files: File[] }> {
-      return apiRequest<Note & { files: File[] }>(API_ENDPOINTS.NOTES.GET(id));
+    async getShared(
+      classLevel?: number,
+      semester?: number
+    ): Promise<Note[]> {
+      const params = new URLSearchParams();
+
+      if (classLevel) params.append("classLevel", classLevel.toString());
+      if (semester) params.append("semester", semester.toString());
+
+      const query = params.toString()
+        ? `?${params.toString()}`
+        : "";
+
+      return apiRequest<Note[]>(
+        `${API_ENDPOINTS.NOTES.SHARED}${query}`
+      );
     },
 
-    // Create note
+
+    async getById(id: number): Promise<Note & { files: NoteFile[] }> {
+      return apiRequest<Note & { files: NoteFile[] }>(
+        API_ENDPOINTS.NOTES.GET(id)
+      );
+    },
+
     async create(note: CreateNoteDto): Promise<Note> {
       return apiRequest<Note>(API_ENDPOINTS.NOTES.CREATE, {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(note),
       });
     },
 
-    // Update note
     async update(id: number, note: UpdateNoteDto): Promise<Note> {
       return apiRequest<Note>(API_ENDPOINTS.NOTES.UPDATE(id), {
-        method: 'PUT',
+        method: "PUT",
         body: JSON.stringify(note),
       });
     },
 
-    // Delete note
     async delete(id: number): Promise<void> {
       return apiRequest<void>(API_ENDPOINTS.NOTES.DELETE(id), {
-        method: 'DELETE',
+        method: "DELETE",
       });
     },
+    async getMyNotes(): Promise<Note[]> {
+      return apiRequest<Note[]>("/notes/my");
+    },
+
   },
 
-  // Files
+  /* ---------- FILES ---------- */
   files: {
-    // Get all files (optional noteId filter)
-    async getAll(noteId?: number): Promise<File[]> {
+    async getAll(noteId?: number): Promise<NoteFile[]> {
       const endpoint = noteId
         ? `${API_ENDPOINTS.FILES.LIST}?noteId=${noteId}`
         : API_ENDPOINTS.FILES.LIST;
-      return apiRequest<File[]>(endpoint);
+
+      return apiRequest<NoteFile[]>(endpoint);
     },
 
-    // Upload file
     async upload(
-      file: File,
+      file: globalThis.File,   // 🔥 TARAYICI FILE
       noteId?: number,
       title?: string
-    ): Promise<File> {
+    ): Promise<NoteFile> {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
+
       if (noteId) {
-        formData.append('noteId', noteId.toString());
-      }
-      if (title) {
-        formData.append('title', title);
+        formData.append("noteId", noteId.toString());
       }
 
-      const response = await apiFileUpload(API_ENDPOINTS.FILES.UPLOAD, formData);
+      if (title) {
+        formData.append("title", title);
+      }
+
+      const response = await apiFileUpload(
+        API_ENDPOINTS.FILES.UPLOAD,
+        formData
+      );
+
       return response.file;
     },
 
-    // Download file
     async download(fileId: number, fileName: string): Promise<void> {
       return downloadFile(fileId, fileName);
     },
 
-    // Delete file
     async delete(id: number): Promise<void> {
       return apiRequest<void>(API_ENDPOINTS.FILES.DELETE(id), {
-        method: 'DELETE',
+        method: "DELETE",
       });
     },
   },
 };
-
-

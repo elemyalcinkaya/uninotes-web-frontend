@@ -10,12 +10,14 @@ export const API_ENDPOINTS = {
   },
   // Notes
   NOTES: {
-    LIST: '/notes',
+    LIST: "/notes",
+    SHARED: "/notes/shared",
     GET: (id: number) => `/notes/${id}`,
-    CREATE: '/notes',
+    CREATE: "/notes",
     UPDATE: (id: number) => `/notes/${id}`,
     DELETE: (id: number) => `/notes/${id}`,
   },
+
   // Files
   FILES: {
     LIST: '/files',
@@ -23,6 +25,7 @@ export const API_ENDPOINTS = {
     DOWNLOAD: (id: number) => `/files/download/${id}`,
     DELETE: (id: number) => `/files/${id}`,
   },
+
 };
 
 // Helper function to get full URL

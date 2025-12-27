@@ -1,7 +1,17 @@
-import { Mail, User, Calendar, FileText, Upload, Edit2, Camera, Loader } from "lucide-react";
+import {
+  Mail,
+  User,
+  Calendar,
+  FileText,
+  Upload,
+  Edit2,
+  Camera,
+  Loader
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { apiService } from "../services/apiService";
+
 interface Note {
   id: number;
   title: string;
@@ -9,6 +19,10 @@ interface Note {
   summary?: string;
   createdAt: string;
   fileCount?: number;
+
+  // 🔴 EKLENDİ – SADECE BU
+  isShared?: boolean;
+
   files?: {
     id: number;
     title: string;
@@ -36,7 +50,11 @@ export default function Profile() {
   const loadUserNotes = async () => {
     try {
       setLoading(true);
-      const notes = await apiService.notes.getAll();
+
+      
+      const notes = await apiService.notes.getMyNotes();
+
+
       setUploadedNotes(notes);
     } catch (err) {
       console.error("Notlar yüklenirken hata:", err);
@@ -57,7 +75,6 @@ export default function Profile() {
   };
 
   const handleSave = async () => {
-    // Profil güncelleme API'si yoksa sadece state'i güncelle
     setIsEditing(false);
     console.log("Profil güncellendi:", { username, email });
   };
@@ -84,13 +101,11 @@ export default function Profile() {
         </div>
       </section>
 
-      {/* Main Content */}
       <main className="mx-auto max-w-5xl px-4 py-12">
         <div className="grid gap-8 lg:grid-cols-3">
-          {/* Sol Kolon - Profil Kartı */}
+          {/* Sol Kolon */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-lg p-8 text-center sticky top-24">
-              {/* Profil Fotoğrafı */}
               <div className="relative inline-block mb-6">
                 <div className="w-32 h-32 rounded-full border-4 border-purple-200 bg-purple-100 flex items-center justify-center text-4xl font-bold text-purple-700">
                   {user.name.charAt(0).toUpperCase()}
@@ -117,7 +132,6 @@ export default function Profile() {
                 </label>
               </div>
 
-              {/* Kullanıcı Adı */}
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 {username}
               </h2>
@@ -125,15 +139,16 @@ export default function Profile() {
                 {email}
               </p>
 
-              {/* İstatistikler */}
+              {/* 🔴 SAYAÇ DÜZELTİLDİ */}
               <div className="border-t border-gray-200 pt-6 mt-6">
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-purple-600">{uploadedNotes.length}</p>
+                  <p className="text-3xl font-bold text-purple-600">
+                    {uploadedNotes.filter(n => n.isShared).length}
+                  </p>
                   <p className="text-sm text-gray-600">Paylaşılan Not</p>
                 </div>
               </div>
 
-              {/* Katılma Tarihi */}
               <div className="border-t border-gray-200 pt-6 mt-6">
                 <div className="flex items-center justify-center gap-2 text-gray-600">
                   <Calendar size={18} />
@@ -143,95 +158,17 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Sağ Kolon - Detaylar */}
+          {/* Sağ Kolon */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Hesap Bilgileri */}
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-2xl font-bold text-gray-900">Hesap Bilgileri</h3>
-                {!isEditing ? (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium transition-colors"
-                  >
-                    <Edit2 size={18} />
-                    Düzenle
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="space-y-6">
-                {/* Kullanıcı Adı */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Kullanıcı Adı
-                  </label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
-                    />
-                  ) : (
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
-                      <User className="text-gray-400" size={20} />
-                      <span className="text-gray-900">{username}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* E-posta */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    E-posta Adresi
-                  </label>
-                  {isEditing ? (
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
-                    />
-                  ) : (
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
-                      <Mail className="text-gray-400" size={20} />
-                      <span className="text-gray-900">{email}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Kaydet/İptal Butonları */}
-                {isEditing && (
-                  <div className="flex gap-4 pt-4">
-                    <button
-                      onClick={handleSave}
-                      className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition-colors"
-                    >
-                      Kaydet
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsEditing(false);
-                        setUsername(user.name);
-                        setEmail(user.email);
-                      }}
-                      className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 rounded-xl transition-colors"
-                    >
-                      İptal
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Paylaşılan Notlar */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold text-gray-900">Paylaşılan Notlarım</h3>
                 <div className="flex items-center gap-2 text-purple-600">
                   <Upload size={20} />
-                  <span className="font-semibold">{uploadedNotes.length} Not</span>
+                  <span className="font-semibold">
+                    {uploadedNotes.filter(n => n.isShared).length} Not
+                  </span>
                 </div>
               </div>
 
@@ -242,7 +179,9 @@ export default function Profile() {
                 </div>
               ) : uploadedNotes.length > 0 ? (
                 <div className="space-y-4">
-                  {uploadedNotes.map((note) => (
+                  {uploadedNotes
+                      .filter(note => note.isShared)
+                      .map((note) => (
                     <div
                       key={note.id}
                       className="flex items-center justify-between p-4 bg-gray-50 hover:bg-purple-50 rounded-xl transition-colors border border-gray-100"
@@ -256,10 +195,16 @@ export default function Profile() {
                           {note.courseCode && (
                             <p className="text-sm text-purple-600">{note.courseCode}</p>
                           )}
+                          {/* 🔴 EKLENDİ */}
+                          {note.isShared && (
+                            <p className="text-xs text-green-600 font-medium">
+                              🌍 Paylaşılan
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="text-sm text-gray-500">
-                        {new Date(note.createdAt).toLocaleDateString('tr-TR')}
+                        {new Date(note.createdAt).toLocaleDateString("tr-TR")}
                       </div>
                     </div>
                   ))}

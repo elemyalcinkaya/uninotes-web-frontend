@@ -1,8 +1,16 @@
-import { FileText, Download, BookOpen, ChevronRight, Calendar, Loader } from "lucide-react";
+import {
+  FileText,
+  Download,
+  BookOpen,
+  Calendar,
+  Loader
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { apiService } from "../services/apiService";
 
-// Burada kendi Note tipimizi tanımlıyoruz
+/* =====================
+   NOTE TYPE
+===================== */
 interface Note {
   id: number;
   title: string;
@@ -10,11 +18,14 @@ interface Note {
   summary?: string;
   createdAt: string;
   fileCount?: number;
-  files?: {
+
+  classLevel: number;   // 🔴
+  semester: number;     // 🔴
+
+  sharedBy?: {
     id: number;
-    title: string;
-    fileUrl: string;
-  }[];
+    name: string;
+  };
 }
 
 export default function SharedNotes() {
@@ -22,29 +33,41 @@ export default function SharedNotes() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    loadNotes();
-  }, []);
+  // 🔴 FILTER STATES
+  const [classLevel, setClassLevel] = useState<number | "">("");
+  const [semester, setSemester] = useState<number | "">("");
 
+  /* =====================
+     LOAD NOTES
+  ===================== */
   const loadNotes = async () => {
     try {
       setLoading(true);
-      const data = await apiService.notes.getAll();
+      const data = await apiService.notes.getShared(
+        classLevel || undefined,
+        semester || undefined
+      );
       setNotes(data);
       setError("");
     } catch (err: any) {
-      setError(err.message || "Notlar yüklenirken bir hata oluştu");
+      setError(err.message || "Notlar yüklenirken hata oluştu");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDownload = async (noteId: number, fileName: string) => {
+  // 🔴 FILTER DEĞİŞİNCE TEKRAR ÇEK
+  useEffect(() => {
+    loadNotes();
+  }, [classLevel, semester]);
+
+  /* =====================
+     DOWNLOAD
+  ===================== */
+  const handleDownload = async (noteId: number) => {
     try {
-      // Önce notun dosyalarını al
       const note = await apiService.notes.getById(noteId);
       if (note.files && note.files.length > 0) {
-        // İlk dosyayı indir
         const file = note.files[0];
         await apiService.files.download(file.id, file.title);
       } else {
@@ -68,18 +91,49 @@ export default function SharedNotes() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <section className="relative bg-gradient-to-br from-purple-600 via-purple-700 to-purple-800 text-white overflow-hidden">
+      {/* HEADER */}
+      <section className="bg-gradient-to-br from-purple-600 via-purple-700 to-purple-800 text-white">
         <div className="mx-auto max-w-7xl px-4 py-12 text-center">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             Paylaşılan Notlar
           </h1>
-          <p className="text-lg md:text-xl text-purple-100 max-w-2xl mx-auto">
+          <p className="text-lg text-purple-100">
             Tüm paylaşılan notları görüntüleyin ve indirin
           </p>
         </div>
       </section>
 
       <main className="mx-auto max-w-6xl px-4 py-8">
+
+        {/* 🔴 FILTER BAR */}
+        <div className="mb-6 flex flex-wrap gap-4">
+          <select
+            value={classLevel}
+            onChange={(e) =>
+              setClassLevel(e.target.value ? Number(e.target.value) : "")
+            }
+            className="border rounded-lg px-3 py-2"
+          >
+            <option value="">Tüm Sınıflar</option>
+            <option value={1}>1. Sınıf</option>
+            <option value={2}>2. Sınıf</option>
+            <option value={3}>3. Sınıf</option>
+            <option value={4}>4. Sınıf</option>
+          </select>
+
+          <select
+            value={semester}
+            onChange={(e) =>
+              setSemester(e.target.value ? Number(e.target.value) : "")
+            }
+            className="border rounded-lg px-3 py-2"
+          >
+            <option value="">Tüm Dönemler</option>
+            <option value={1}>Güz</option>
+            <option value={2}>Bahar</option>
+          </select>
+        </div>
+
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-600">{error}</p>
@@ -91,30 +145,45 @@ export default function SharedNotes() {
             {notes.map((note) => (
               <div
                 key={note.id}
-                className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
+                className="bg-white rounded-2xl shadow-sm border hover:shadow-lg transition-all hover:-translate-y-1"
               >
                 <div className="p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="bg-purple-100 p-3 rounded-lg">
-                      <BookOpen className="text-purple-700" size={24} />
-                    </div>
+                  <div className="bg-purple-100 p-3 rounded-lg w-fit mb-3">
+                    <BookOpen className="text-purple-700" size={24} />
                   </div>
 
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  <h3 className="text-xl font-semibold mb-1">
                     {note.title}
                   </h3>
+
+                  {/* 🔴 SINIF + DÖNEM */}
+                  <p className="text-xs text-gray-500 mb-2">
+                    {note.classLevel}. Sınıf •{" "}
+                    {note.semester === 1 ? "Güz" : "Bahar"}
+                  </p>
+
+                  {note.sharedBy && (
+                    <p className="text-sm text-gray-500 mb-2">
+                      Paylaşan:{" "}
+                      <span className="font-medium text-purple-700">
+                        {note.sharedBy.name}
+                      </span>
+                    </p>
+                  )}
+
                   {note.courseCode && (
                     <p className="text-sm text-purple-700 font-medium mb-2">
                       {note.courseCode}
                     </p>
                   )}
+
                   {note.summary && (
                     <p className="text-gray-600 text-sm mb-4 line-clamp-2">
                       {note.summary}
                     </p>
                   )}
 
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                  <div className="flex justify-between text-sm text-gray-500 mb-4">
                     <div className="flex items-center gap-1">
                       <Calendar size={14} />
                       {new Date(note.createdAt).toLocaleDateString("tr-TR")}
@@ -127,8 +196,8 @@ export default function SharedNotes() {
                   </div>
 
                   <button
-                    onClick={() => handleDownload(note.id, note.title)}
-                    className="w-full bg-purple-700 hover:bg-purple-800 text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                    onClick={() => handleDownload(note.id)}
+                    className="w-full bg-purple-700 hover:bg-purple-800 text-white py-3 rounded-xl flex items-center justify-center gap-2"
                   >
                     <Download size={18} />
                     İndir
@@ -140,8 +209,12 @@ export default function SharedNotes() {
         ) : (
           <div className="text-center py-16 bg-white rounded-2xl shadow-sm">
             <FileText className="mx-auto text-gray-300 mb-4" size={64} />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">Henüz not yok</h3>
-            <p className="text-gray-500">İlk notu paylaşan siz olun!</p>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+              Henüz not yok
+            </h3>
+            <p className="text-gray-500">
+              Filtreye uygun not bulunamadı
+            </p>
           </div>
         )}
       </main>
