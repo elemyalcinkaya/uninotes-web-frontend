@@ -3,14 +3,13 @@ import {
   Download,
   BookOpen,
   Calendar,
-  Loader
+  Loader,
+  Sparkles,
+  TrendingUp
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { apiService } from "../services/apiService";
 
-/* =====================
-   NOTE TYPE
-===================== */
 interface Note {
   id: number;
   title: string;
@@ -19,8 +18,8 @@ interface Note {
   createdAt: string;
   fileCount?: number;
 
-  classLevel: number;   // 🔴
-  semester: number;     // 🔴
+  classLevel: number;
+  semester: number;
 
   sharedBy?: {
     id: number;
@@ -32,8 +31,9 @@ export default function SharedNotes() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
-  // 🔴 FILTER STATES
+  // FILTER STATES
   const [classLevel, setClassLevel] = useState<number | "">("");
   const [semester, setSemester] = useState<number | "">("");
 
@@ -50,13 +50,13 @@ export default function SharedNotes() {
       setNotes(data);
       setError("");
     } catch (err: any) {
-      setError(err.message || "Notlar yüklenirken hata oluştu");
+      setError(err.message || "Error loading notes");
     } finally {
       setLoading(false);
     }
   };
 
-  // 🔴 FILTER DEĞİŞİNCE TEKRAR ÇEK
+  // RELOAD WHEN FILTERS CHANGE
   useEffect(() => {
     loadNotes();
   }, [classLevel, semester]);
@@ -66,158 +66,294 @@ export default function SharedNotes() {
   ===================== */
   const handleDownload = async (noteId: number) => {
     try {
-      const note = await apiService.notes.getById(noteId);
-      if (note.files && note.files.length > 0) {
-        const file = note.files[0];
+      setDownloadingId(noteId);
+
+      // Find the note in our current list
+      const note = notes.find(n => n.id === noteId);
+
+      if (!note) {
+        alert("Note not found");
+        return;
+      }
+
+      // For shared notes, we need to fetch the full note details including files
+      // But we'll use the files endpoint directly to avoid 405 error
+      const files = await apiService.files.getAll(noteId);
+
+      if (files && files.length > 0) {
+        const file = files[0];
         await apiService.files.download(file.id, file.title);
       } else {
-        alert("Bu not için dosya bulunamadı");
+        alert("No files found for this note");
       }
     } catch (err: any) {
-      alert(err.message || "İndirme sırasında bir hata oluştu");
+      console.error("Download error:", err);
+      alert(err.message || "An error occurred during download");
+    } finally {
+      setDownloadingId(null);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50 to-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader className="animate-spin mx-auto text-purple-600 mb-4" size={48} />
-          <p className="text-gray-600">Notlar yükleniyor...</p>
+          <div className="relative">
+            <Loader className="animate-spin mx-auto text-purple-600 mb-4" size={48} />
+            <Sparkles className="absolute top-0 right-0 text-purple-400 animate-pulse" size={20} />
+          </div>
+          <p className="text-gray-600 font-medium">Loading notes...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50 to-gray-50">
       {/* HEADER */}
-      <section className="bg-gradient-to-br from-purple-600 via-purple-700 to-purple-800 text-white">
-        <div className="mx-auto max-w-7xl px-4 py-12 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            Paylaşılan Notlar
+      <section className="relative bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 text-white overflow-hidden">
+        {/* Animated background patterns */}
+        <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-purple-900/50" />
+
+        {/* Floating shapes */}
+        <div className="absolute top-20 left-10 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-10 right-10 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+
+        <div className="relative mx-auto max-w-7xl px-4 py-16 text-center">
+
+          <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-200 animate-fade-in-up">
+            Shared Notes
           </h1>
-          <p className="text-lg text-purple-100">
-            Tüm paylaşılan notları görüntüleyin ve indirin
+          <p className="text-lg md:text-xl text-purple-100 max-w-2xl mx-auto animate-fade-in-up delay-100">
+            Browse and download notes shared by fellow students
           </p>
+
+          {/* Stats */}
+          <div className="flex justify-center gap-8 mt-8 animate-fade-in-up delay-200">
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-2 text-3xl font-bold">
+                <TrendingUp size={28} className="text-green-300" />
+                {notes.length}
+              </div>
+              <p className="text-sm text-purple-200 mt-1">Available Notes</p>
+            </div>
+          </div>
         </div>
       </section>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-7xl px-4 py-12">
 
-        {/* 🔴 FILTER BAR */}
-        <div className="mb-6 flex flex-wrap gap-4">
-          <select
-            value={classLevel}
-            onChange={(e) =>
-              setClassLevel(e.target.value ? Number(e.target.value) : "")
-            }
-            className="border rounded-lg px-3 py-2"
-          >
-            <option value="">Tüm Sınıflar</option>
-            <option value={1}>1. Sınıf</option>
-            <option value={2}>2. Sınıf</option>
-            <option value={3}>3. Sınıf</option>
-            <option value={4}>4. Sınıf</option>
-          </select>
+        {/* FILTER BAR */}
+        <div className="mb-8 bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-purple-100 animate-fade-in">
+          <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex items-center gap-2 text-gray-700 font-semibold">
+              <BookOpen size={20} className="text-purple-600" />
+              <span>Filter by:</span>
+            </div>
 
-          <select
-            value={semester}
-            onChange={(e) =>
-              setSemester(e.target.value ? Number(e.target.value) : "")
-            }
-            className="border rounded-lg px-3 py-2"
-          >
-            <option value="">Tüm Dönemler</option>
-            <option value={1}>Güz</option>
-            <option value={2}>Bahar</option>
-          </select>
+            <select
+              value={classLevel}
+              onChange={(e) =>
+                setClassLevel(e.target.value ? Number(e.target.value) : "")
+              }
+              className="flex-1 min-w-[150px] border-2 border-purple-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all hover:border-purple-300 bg-white"
+            >
+              <option value="">All Classes</option>
+              <option value={1}>1st Year</option>
+              <option value={2}>2nd Year</option>
+              <option value={3}>3rd Year</option>
+              <option value={4}>4th Year</option>
+            </select>
+
+            <select
+              value={semester}
+              onChange={(e) =>
+                setSemester(e.target.value ? Number(e.target.value) : "")
+              }
+              className="flex-1 min-w-[150px] border-2 border-purple-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all hover:border-purple-300 bg-white"
+            >
+              <option value="">All Semesters</option>
+              <option value={1}>Fall</option>
+              <option value={2}>Spring</option>
+            </select>
+          </div>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg animate-shake">
+            <p className="text-sm text-red-600 font-medium">{error}</p>
           </div>
         )}
 
         {notes.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {notes.map((note) => (
+            {notes.map((note, index) => (
               <div
                 key={note.id}
-                className="bg-white rounded-2xl shadow-sm border hover:shadow-lg transition-all hover:-translate-y-1"
+                className="group bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-2xl hover:border-purple-200 transition-all duration-300 hover:-translate-y-2 overflow-hidden animate-fade-in-up"
+                style={{ animationDelay: `${index * 50}ms` }}
               >
+                {/* Card Header with Gradient */}
+                <div className="h-2 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500" />
+
                 <div className="p-6">
-                  <div className="bg-purple-100 p-3 rounded-lg w-fit mb-3">
-                    <BookOpen className="text-purple-700" size={24} />
+                  {/* Icon */}
+                  <div className="relative mb-4">
+                    <div className="bg-gradient-to-br from-purple-100 to-purple-200 p-4 rounded-xl w-fit group-hover:scale-110 transition-transform duration-300 shadow-md">
+                      <BookOpen className="text-purple-700" size={28} />
+                    </div>
+                    {note.fileCount && note.fileCount > 1 && (
+                      <div className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg">
+                        {note.fileCount}
+                      </div>
+                    )}
                   </div>
 
-                  <h3 className="text-xl font-semibold mb-1">
+                  {/* Title */}
+                  <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-purple-700 transition-colors line-clamp-2">
                     {note.title}
                   </h3>
 
-                  {/* 🔴 SINIF + DÖNEM */}
-                  <p className="text-xs text-gray-500 mb-2">
-                    {note.classLevel}. Sınıf •{" "}
-                    {note.semester === 1 ? "Güz" : "Bahar"}
-                  </p>
+                  {/* Class + Semester Badge */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="inline-flex items-center gap-1 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 text-xs font-semibold px-3 py-1 rounded-full">
+                      {note.classLevel}th Year
+                    </span>
+                    <span className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-700 text-xs font-semibold px-3 py-1 rounded-full">
+                      {note.semester === 1 ? "Fall" : "Spring"}
+                    </span>
+                  </div>
 
-                  {note.sharedBy && (
-                    <p className="text-sm text-gray-500 mb-2">
-                      Paylaşan:{" "}
-                      <span className="font-medium text-purple-700">
-                        {note.sharedBy.name}
+                  {/* Shared By */}
+                  {(note.sharedBy || (note as any).user) && (
+                    <p className="text-sm text-gray-500 mb-3 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      Shared by:{" "}
+                      <span className="font-semibold text-purple-700">
+                        {note.sharedBy?.name || (note as any).user?.name || 'Unknown'}
                       </span>
                     </p>
                   )}
 
+                  {/* Course Code */}
                   {note.courseCode && (
-                    <p className="text-sm text-purple-700 font-medium mb-2">
-                      {note.courseCode}
-                    </p>
+                    <div className="mb-3">
+                      <span className="inline-block bg-gray-100 text-gray-700 text-sm font-mono px-3 py-1 rounded-lg">
+                        {note.courseCode}
+                      </span>
+                    </div>
                   )}
 
+                  {/* Summary */}
                   {note.summary && (
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
                       {note.summary}
                     </p>
                   )}
 
-                  <div className="flex justify-between text-sm text-gray-500 mb-4">
-                    <div className="flex items-center gap-1">
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
                       <Calendar size={14} />
-                      {new Date(note.createdAt).toLocaleDateString("tr-TR")}
+                      {new Date(note.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric"
+                      })}
                     </div>
-                    {note.fileCount !== undefined && (
-                      <span className="text-purple-600 font-medium">
-                        {note.fileCount} dosya
-                      </span>
-                    )}
                   </div>
 
+                  {/* Download Button */}
                   <button
                     onClick={() => handleDownload(note.id)}
-                    className="w-full bg-purple-700 hover:bg-purple-800 text-white py-3 rounded-xl flex items-center justify-center gap-2"
+                    disabled={downloadingId === note.id}
+                    className="mt-4 w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-semibold group-hover:scale-105"
                   >
-                    <Download size={18} />
-                    İndir
+                    {downloadingId === note.id ? (
+                      <>
+                        <Loader className="animate-spin" size={18} />
+                        Downloading...
+                      </>
+                    ) : (
+                      <>
+                        <Download size={18} />
+                        Download
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 bg-white rounded-2xl shadow-sm">
-            <FileText className="mx-auto text-gray-300 mb-4" size={64} />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">
-              Henüz not yok
+          <div className="text-center py-20 bg-white/80 backdrop-blur-sm rounded-3xl shadow-lg border border-purple-100 animate-fade-in">
+            <div className="relative inline-block mb-6">
+              <FileText className="mx-auto text-gray-300" size={80} />
+              <Sparkles className="absolute -top-2 -right-2 text-purple-400 animate-pulse" size={24} />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-700 mb-2">
+              No notes found
             </h3>
-            <p className="text-gray-500">
-              Filtreye uygun not bulunamadı
+            <p className="text-gray-500 max-w-md mx-auto">
+              No notes match your current filters. Try adjusting your search criteria.
             </p>
           </div>
         )}
       </main>
+
+      {/* Custom CSS for animations */}
+      <style>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes fade-in-up {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out;
+        }
+
+        .animate-fade-in-up {
+          animation: fade-in-up 0.6s ease-out;
+        }
+
+        .animate-shake {
+          animation: shake 0.5s ease-out;
+        }
+
+        .delay-100 {
+          animation-delay: 100ms;
+        }
+
+        .delay-200 {
+          animation-delay: 200ms;
+        }
+
+        .delay-1000 {
+          animation-delay: 1000ms;
+        }
+      `}</style>
     </div>
   );
 }

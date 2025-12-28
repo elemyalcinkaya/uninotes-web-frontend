@@ -1,4 +1,4 @@
-import { Upload, FileText, X, Check } from "lucide-react";
+import { Upload, FileText, X } from "lucide-react";
 import { useState } from "react";
 import { apiService } from "../services/apiService";
 import { useNavigate } from "react-router-dom";
@@ -12,7 +12,6 @@ export default function AddNotes() {
   const [courseCode, setCourseCode] = useState("");
   const [summary, setSummary] = useState("");
 
-  // 🔴 YENİ: sınıf & dönem
   const [classLevel, setClassLevel] = useState<number>(1);
   const [semester, setSemester] = useState<number>(1);
 
@@ -47,10 +46,22 @@ export default function AddNotes() {
   };
 
   const handleFile = (file: globalThis.File) => {
+    // Check file size
     if (file.size > 50 * 1024 * 1024) {
-      setError("Dosya boyutu 50MB'dan büyük olamaz");
+      setError("File size cannot exceed 50MB");
       return;
     }
+
+    // Check file type
+    const allowedExtensions = ['.pdf', '.docx', '.jpeg', '.jpg'];
+    const fileName = file.name.toLowerCase();
+    const isAllowed = allowedExtensions.some(ext => fileName.endsWith(ext));
+
+    if (!isAllowed) {
+      setError("Only .pdf, .docx, and .jpeg files are allowed");
+      return;
+    }
+
     setSelectedFile(file);
     setError("");
     if (!title) {
@@ -68,7 +79,7 @@ export default function AddNotes() {
 
   const handleUpload = async () => {
     if (!selectedFile || !title) {
-      setError("Lütfen dosya ve başlık alanlarını doldurun!");
+      setError("Please fill in the file and title fields!");
       return;
     }
 
@@ -76,17 +87,17 @@ export default function AddNotes() {
     setError("");
 
     try {
-      // 🔴 NOT OLUŞTUR
+      // CREATE NOTE
       const note = await apiService.notes.create({
         title,
         courseCode: courseCode || undefined,
         summary: summary || undefined,
-        classLevel,   
-        semester,     
+        classLevel,
+        semester,
         isShared: true,
       });
 
-      // 🔴 DOSYA YÜKLE
+      // UPLOAD FILE
       await apiService.files.upload(
         selectedFile,
         note.id,
@@ -104,7 +115,7 @@ export default function AddNotes() {
         navigate("/shared-notes");
       }, 2000);
     } catch (err: any) {
-      setError(err.message || "Yükleme sırasında bir hata oluştu");
+      setError(err.message || "An error occurred during upload");
     } finally {
       setUploading(false);
     }
@@ -117,9 +128,9 @@ export default function AddNotes() {
       {/* Header */}
       <section className="relative bg-gradient-to-br from-purple-600 via-purple-700 to-purple-800 text-white overflow-hidden">
         <div className="mx-auto max-w-7xl px-4 py-12 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Not Ekle</h1>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Add Note</h1>
           <p className="text-lg md:text-xl text-purple-100 max-w-2xl mx-auto">
-            Notlarını paylaş, arkadaşlarına yardımcı ol
+            Share your notes and help your peers
           </p>
         </div>
       </section>
@@ -130,26 +141,28 @@ export default function AddNotes() {
           {/* DOSYA */}
           <div className="mb-8">
             <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Dosya Yükle
+              Upload File
             </label>
+            <p className="text-xs text-gray-500 mb-2">
+              📎 Allowed file types: <span className="font-medium text-purple-600">.pdf, .docx, .jpeg</span>
+            </p>
 
             <div
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
               onDrop={handleDrop}
-              className={`relative border-2 border-dashed rounded-xl transition-all duration-200 ${
-                dragActive
-                  ? "border-purple-500 bg-purple-50"
-                  : "border-gray-300 bg-gray-50"
-              }`}
+              className={`relative border-2 border-dashed rounded-xl transition-all duration-200 ${dragActive
+                ? "border-purple-500 bg-purple-50"
+                : "border-gray-300 bg-gray-50"
+                }`}
             >
               <input
                 type="file"
                 id="file-upload"
                 className="hidden"
                 onChange={handleFileInput}
-                accept=".pdf,.doc,.docx,.ppt,.pptx"
+                accept=".pdf,.docx,.jpeg,.jpg"
               />
 
               {!selectedFile ? (
@@ -159,11 +172,17 @@ export default function AddNotes() {
                 >
                   <Upload className="mb-4 text-gray-400" size={48} />
                   <p className="text-lg font-medium text-gray-700 mb-2">
-                    Dosyayı sürükle bırak
+                    Drag and drop your file here
                   </p>
-                  <span className="bg-purple-600 text-white px-6 py-2 rounded-lg">
-                    Dosya Seç
+                  <p className="text-sm text-gray-500 mb-3">
+                    or
+                  </p>
+                  <span className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition">
+                    Choose File
                   </span>
+                  <p className="text-xs text-gray-400 mt-3">
+                    Supported: PDF, DOCX, JPEG (Max 50MB)
+                  </p>
                 </label>
               ) : (
                 <div className="p-6 flex items-center justify-between">
@@ -193,7 +212,7 @@ export default function AddNotes() {
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Not Başlığı"
+                placeholder="Note Title"
                 className="w-full px-4 py-3 border rounded-lg"
               />
 
@@ -201,37 +220,37 @@ export default function AddNotes() {
               <input
                 value={courseCode}
                 onChange={(e) => setCourseCode(e.target.value)}
-                placeholder="Ders Kodu (Opsiyonel)"
+                placeholder="Course Code (Optional)"
                 className="w-full px-4 py-3 border rounded-lg"
               />
 
-              {/* 🔴 SINIF */}
+              {/* SINIF */}
               <select
                 value={classLevel}
                 onChange={(e) => setClassLevel(Number(e.target.value))}
                 className="w-full px-4 py-3 border rounded-lg"
               >
-                <option value={1}>1. Sınıf</option>
-                <option value={2}>2. Sınıf</option>
-                <option value={3}>3. Sınıf</option>
-                <option value={4}>4. Sınıf</option>
+                <option value={1}>1st Year</option>
+                <option value={2}>2nd Year</option>
+                <option value={3}>3rd Year</option>
+                <option value={4}>4th Year</option>
               </select>
 
-              {/* 🔴 DÖNEM */}
+              {/*DÖNEM */}
               <select
                 value={semester}
                 onChange={(e) => setSemester(Number(e.target.value))}
                 className="w-full px-4 py-3 border rounded-lg"
               >
-                <option value={1}>Güz</option>
-                <option value={2}>Bahar</option>
+                <option value={1}>Fall</option>
+                <option value={2}>Spring</option>
               </select>
 
               {/* Özet */}
               <textarea
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                placeholder="Not Özeti"
+                placeholder="Note Summary"
                 rows={4}
                 className="w-full px-4 py-3 border rounded-lg"
               />
@@ -245,7 +264,7 @@ export default function AddNotes() {
             disabled={!isFormValid || uploading || uploadSuccess}
             className="w-full py-4 rounded-xl bg-purple-600 text-white font-semibold"
           >
-            {uploading ? "Yükleniyor..." : uploadSuccess ? "Yüklendi" : "Notu Yükle"}
+            {uploading ? "Uploading..." : uploadSuccess ? "Uploaded!" : "Upload Note"}
           </button>
         </div>
       </main>

@@ -26,6 +26,11 @@ export const API_ENDPOINTS = {
     DELETE: (id: number) => `/files/${id}`,
   },
 
+  // Contact
+  CONTACT: {
+    SEND: '/contact/send',
+  },
+
 };
 
 // Helper function to get full URL

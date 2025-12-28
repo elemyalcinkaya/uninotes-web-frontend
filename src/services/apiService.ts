@@ -122,6 +122,8 @@ export interface Note {
   createdAt: string;
   updatedAt: string;
   fileCount?: number;
+  classLevel: number;
+  semester: number;
 
   sharedBy?: {
     id: number;
@@ -144,6 +146,8 @@ export interface CreateNoteDto {
   title: string;
   courseCode?: string;
   summary?: string;
+  classLevel: number;
+  semester: number;
   isShared?: boolean;
 }
 
@@ -153,6 +157,14 @@ export interface UpdateNoteDto {
   summary?: string;
   isShared?: boolean;
 }
+
+export interface ContactMessageDto {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}
+
 
 /* ===========================
    API SERVICE
@@ -255,6 +267,16 @@ export const apiService = {
     async delete(id: number): Promise<void> {
       return apiRequest<void>(API_ENDPOINTS.FILES.DELETE(id), {
         method: "DELETE",
+      });
+    },
+  },
+
+  /* ---------- CONTACT ---------- */
+  contact: {
+    async send(data: ContactMessageDto): Promise<void> {
+      return apiRequest<void>(API_ENDPOINTS.CONTACT.SEND, {
+        method: "POST",
+        body: JSON.stringify(data),
       });
     },
   },
