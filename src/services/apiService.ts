@@ -165,6 +165,62 @@ export interface ContactMessageDto {
   message: string;
 }
 
+export interface Course {
+  id: number;
+  courseCode: string;
+  courseName?: string;
+  classLevel: number;
+  semester: number;
+  isElective: boolean;
+  createdAt: string;
+}
+
+export interface Tag {
+  id: number;
+  name: string;
+  createdAt: string;
+}
+
+export interface NoteTag {
+  id: number;
+  noteId: number;
+  tagId: number;
+  tag?: Tag;
+}
+
+export interface Favorite {
+  id: number;
+  userId: number;
+  noteId: number;
+  createdAt: string;
+  note?: Note;
+}
+
+export interface Download {
+  id: number;
+  userId: number;
+  noteId: number;
+  fileId: number;
+  downloadedAt: string;
+}
+
+export interface ReportReason {
+  id: number;
+  reasonText: string;
+  createdAt: string;
+}
+
+export interface Report {
+  id: number;
+  noteId: number;
+  userId: number;
+  reportReasonId: number;
+  createdAt: string;
+  note?: Note;
+  reportReason?: ReportReason;
+}
+
+
 
 /* ===========================
    API SERVICE
@@ -278,6 +334,92 @@ export const apiService = {
         method: "POST",
         body: JSON.stringify(data),
       });
+    },
+  },
+
+  /* ---------- COURSES ---------- */
+  courses: {
+    async getAll(): Promise<Course[]> {
+      return apiRequest<Course[]>(API_ENDPOINTS.COURSES.LIST);
+    },
+
+    async getByClassLevelAndSemester(
+      classLevel: number,
+      semester: number
+    ): Promise<Course[]> {
+      return apiRequest<Course[]>(
+        API_ENDPOINTS.COURSES.BY_CLASS_AND_SEMESTER(classLevel, semester)
+      );
+    },
+  },
+
+  /* ---------- TAGS ---------- */
+  tags: {
+    async getAll(): Promise<Tag[]> {
+      return apiRequest<Tag[]>("/tags");
+    },
+
+    async getPopular(): Promise<Tag[]> {
+      return apiRequest<Tag[]>("/tags/popular");
+    },
+  },
+
+  /* ---------- FAVORITES ---------- */
+  favorites: {
+    async getMyFavorites(): Promise<Favorite[]> {
+      return apiRequest<Favorite[]>("/favorites/my");
+    },
+
+    async add(noteId: number): Promise<Favorite> {
+      return apiRequest<Favorite>("/favorites", {
+        method: "POST",
+        body: JSON.stringify({ noteId }),
+      });
+    },
+
+    async remove(noteId: number): Promise<void> {
+      return apiRequest<void>(`/favorites/${noteId}`, {
+        method: "DELETE",
+      });
+    },
+
+    async check(noteId: number): Promise<boolean> {
+      return apiRequest<boolean>(`/favorites/check/${noteId}`);
+    },
+  },
+
+  /* ---------- DOWNLOADS ---------- */
+  downloads: {
+    async track(noteId: number, fileId: number): Promise<Download> {
+      return apiRequest<Download>(API_ENDPOINTS.DOWNLOADS.TRACK, {
+        method: "POST",
+        body: JSON.stringify({ noteId, fileId }),
+      });
+    },
+
+    async getMyDownloads(): Promise<Download[]> {
+      return apiRequest<Download[]>(API_ENDPOINTS.DOWNLOADS.MY);
+    },
+  },
+
+  /* ---------- REPORTS ---------- */
+  reports: {
+    async create(noteId: number, reportReasonId: number): Promise<void> {
+      return apiRequest<void>(API_ENDPOINTS.REPORTS.CREATE, {
+        method: "POST",
+        body: JSON.stringify({ noteId, reportReasonId }),
+      });
+    },
+
+    async getAll(): Promise<Report[]> {
+      return apiRequest<Report[]>(API_ENDPOINTS.REPORTS.LIST);
+    },
+  },
+
+  /* ---------- REPORT REASONS ---------- */
+  reportReasons: {
+    async getAll(): Promise<ReportReason[]> {
+      return apiRequest<ReportReason[]>(API_ENDPOINTS.REPORT_REASONS.LIST);
     },
   },
 };

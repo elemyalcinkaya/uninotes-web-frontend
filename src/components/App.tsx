@@ -227,20 +227,26 @@ function Layout() {
             <img src={logo} alt="UniNotes Logo" className="h-11 md:h-12 w-auto" />
           </button>
           <nav className="hidden md:flex items-center gap-4">
-            {isAuthenticated && user && (
-              <span className="text-sm mr-2">
-                Welcome, <span className="font-semibold">{user.name}</span>
-              </span>
-            )}
-
             <NavLink icon={Home} label="About" to="/about" />
 
             {isAuthenticated && (
               <>
                 <NavLink icon={FileText} label="Shared Notes" to="/shared-notes" />
                 <NavLink icon={Upload} label="Add Note" to="/add-notes" />
-                <NavLink icon={User} label="Profile" to="/profile" />
+
+                {/* Combined Profile Button with User Name */}
+                {user && (
+                  <button
+                    onClick={() => navigate("/profile")}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 transition"
+                  >
+                    <User size={18} />
+                    <span className="font-medium">Profile, <span className="font-semibold">{user.name}</span></span>
+                  </button>
+                )}
+
                 <NavLink icon={Home} label="Contact Us" to="/contact" />
+
                 <button
                   onClick={handleLogout}
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 transition"

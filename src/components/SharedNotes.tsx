@@ -5,10 +5,14 @@ import {
   Calendar,
   Loader,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  FileType,
+  FileImage,
+  AlertTriangle
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { apiService } from "../services/apiService";
+import ReportModal from "./ReportModal";
 
 interface Note {
   id: number;
@@ -32,10 +36,14 @@ export default function SharedNotes() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [fileInfo, setFileInfo] = useState<Record<number, string>>({});
 
   // FILTER STATES
   const [classLevel, setClassLevel] = useState<number | "">("");
   const [semester, setSemester] = useState<number | "">("");
+
+  // REPORT MODAL STATE
+  const [reportModalNoteId, setReportModalNoteId] = useState<number | null>(null);
 
   /* =====================
      LOAD NOTES
@@ -48,6 +56,21 @@ export default function SharedNotes() {
         semester || undefined
       );
       setNotes(data);
+
+      // Fetch file info for each note to get file names for icons
+      const fileInfoMap: Record<number, string> = {};
+      for (const note of data) {
+        try {
+          const files = await apiService.files.getAll(note.id);
+          if (files && files.length > 0) {
+            fileInfoMap[note.id] = files[0].title;
+          }
+        } catch (err) {
+          console.error(`Failed to fetch file info for note ${note.id}:`, err);
+        }
+      }
+      setFileInfo(fileInfoMap);
+
       setError("");
     } catch (err: any) {
       setError(err.message || "Error loading notes");
@@ -60,6 +83,47 @@ export default function SharedNotes() {
   useEffect(() => {
     loadNotes();
   }, [classLevel, semester]);
+
+  /* =====================
+     FILE TYPE ICON HELPER
+  ===================== */
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.toLowerCase().split('.').pop();
+
+    if (ext === 'pdf') {
+      return (
+        <div className="flex items-center gap-1.5 bg-red-100 text-red-700 px-2 py-1 rounded-md">
+          <FileText size={16} />
+          <span className="text-xs font-bold">PDF</span>
+        </div>
+      );
+    }
+
+    if (ext === 'docx' || ext === 'doc') {
+      return (
+        <div className="flex items-center gap-1.5 bg-blue-100 text-blue-700 px-2 py-1 rounded-md">
+          <FileType size={16} />
+          <span className="text-xs font-bold">WORD</span>
+        </div>
+      );
+    }
+
+    if (ext === 'jpeg' || ext === 'jpg' || ext === 'png') {
+      return (
+        <div className="flex items-center gap-1.5 bg-green-100 text-green-700 px-2 py-1 rounded-md">
+          <FileImage size={16} />
+          <span className="text-xs font-bold">JPEG</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-2 py-1 rounded-md">
+        <FileText size={16} />
+        <span className="text-xs font-bold">FILE</span>
+      </div>
+    );
+  };
 
   /* =====================
      DOWNLOAD
@@ -82,6 +146,15 @@ export default function SharedNotes() {
 
       if (files && files.length > 0) {
         const file = files[0];
+
+        // Track the download
+        try {
+          await apiService.downloads.track(noteId, file.id);
+        } catch (trackErr) {
+          console.error("Failed to track download:", trackErr);
+          // Continue with download even if tracking fails
+        }
+
         await apiService.files.download(file.id, file.title);
       } else {
         alert("No files found for this note");
@@ -191,13 +264,23 @@ export default function SharedNotes() {
             {notes.map((note, index) => (
               <div
                 key={note.id}
-                className="group bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-2xl hover:border-purple-200 transition-all duration-300 hover:-translate-y-2 overflow-hidden animate-fade-in-up"
+                className="group bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-2xl hover:border-purple-200 transition-all duration-300 hover:-translate-y-2 overflow-hidden animate-fade-in-up relative"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 {/* Card Header with Gradient */}
                 <div className="h-2 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500" />
 
-                <div className="p-6">
+                {/* Report Button - Top Right */}
+                <button
+                  onClick={() => setReportModalNoteId(note.id)}
+                  className="absolute top-4 right-4 z-10 bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-lg shadow-lg transition-all hover:scale-110 flex items-center gap-1.5 text-xs font-semibold"
+                  title="Report this note"
+                >
+                  <AlertTriangle size={14} />
+                  Report
+                </button>
+
+                <div className="p-6 pt-12">
                   {/* Icon */}
                   <div className="relative mb-4">
                     <div className="bg-gradient-to-br from-purple-100 to-purple-200 p-4 rounded-xl w-fit group-hover:scale-110 transition-transform duration-300 shadow-md">
@@ -277,6 +360,7 @@ export default function SharedNotes() {
                       </>
                     ) : (
                       <>
+                        {fileInfo[note.id] && getFileIcon(fileInfo[note.id])}
                         <Download size={18} />
                         Download
                       </>
@@ -301,6 +385,17 @@ export default function SharedNotes() {
           </div>
         )}
       </main>
+
+      {/* Report Modal */}
+      {reportModalNoteId !== null && (
+        <ReportModal
+          noteId={reportModalNoteId}
+          onClose={() => setReportModalNoteId(null)}
+          onSuccess={() => {
+            alert("Report submitted successfully. Thank you for helping us maintain quality!");
+          }}
+        />
+      )}
 
       {/* Custom CSS for animations */}
       <style>{`

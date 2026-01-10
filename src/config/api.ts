@@ -31,6 +31,30 @@ export const API_ENDPOINTS = {
     SEND: '/contact/send',
   },
 
+  // Courses
+  COURSES: {
+    LIST: '/courses',
+    BY_CLASS_AND_SEMESTER: (classLevel: number, semester: number) =>
+      `/courses/ByClassLevelAndSemester/${classLevel}/${semester}`,
+  },
+
+  // Downloads
+  DOWNLOADS: {
+    TRACK: '/downloads',
+    MY: '/downloads/my',
+  },
+
+  // Reports
+  REPORTS: {
+    CREATE: '/reports',
+    LIST: '/reports',
+  },
+
+  // Report Reasons
+  REPORT_REASONS: {
+    LIST: '/reportreasons',
+  },
+
 };
 
 // Helper function to get full URL

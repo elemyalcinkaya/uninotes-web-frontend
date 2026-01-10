@@ -2,7 +2,9 @@ import {
   FileText,
   Upload,
   Loader,
-  Trash2
+  Trash2,
+  FileType,
+  FileImage
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
@@ -31,6 +33,7 @@ export default function Profile() {
   const [email, setEmail] = useState(user?.email || "");
   const [uploadedNotes, setUploadedNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fileInfo, setFileInfo] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (user) {
@@ -40,15 +43,66 @@ export default function Profile() {
     }
   }, [user]);
 
+  // File type icon helper
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.toLowerCase().split('.').pop();
+
+    if (ext === 'pdf') {
+      return (
+        <div className="flex items-center gap-1.5 bg-red-100 text-red-700 px-2 py-1 rounded-md">
+          <FileText size={16} />
+          <span className="text-xs font-bold">PDF</span>
+        </div>
+      );
+    }
+
+    if (ext === 'docx' || ext === 'doc') {
+      return (
+        <div className="flex items-center gap-1.5 bg-blue-100 text-blue-700 px-2 py-1 rounded-md">
+          <FileType size={16} />
+          <span className="text-xs font-bold">WORD</span>
+        </div>
+      );
+    }
+
+    if (ext === 'jpeg' || ext === 'jpg' || ext === 'png') {
+      return (
+        <div className="flex items-center gap-1.5 bg-green-100 text-green-700 px-2 py-1 rounded-md">
+          <FileImage size={16} />
+          <span className="text-xs font-bold">JPEG</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-2 py-1 rounded-md">
+        <FileText size={16} />
+        <span className="text-xs font-bold">FILE</span>
+      </div>
+    );
+  };
+
   const loadUserNotes = async () => {
     try {
       setLoading(true);
 
-
       const notes = await apiService.notes.getMyNotes();
-
-
       setUploadedNotes(notes);
+
+      // Fetch file info for each note to get file names for icons
+      const fileInfoMap: Record<number, string> = {};
+      for (const note of notes) {
+        try {
+          const files = await apiService.files.getAll(note.id);
+          if (files && files.length > 0) {
+            fileInfoMap[note.id] = files[0].title;
+          }
+        } catch (err) {
+          console.error(`Failed to fetch file info for note ${note.id}:`, err);
+        }
+      }
+      setFileInfo(fileInfoMap);
+
     } catch (err) {
       console.error("Notlar yüklenirken hata:", err);
     } finally {
@@ -156,7 +210,7 @@ export default function Profile() {
                       >
                         <div className="flex items-center gap-4">
                           <div className="bg-gradient-to-br from-purple-100 to-purple-200 p-3 rounded-lg shadow-sm">
-                            <FileText className="text-purple-700" size={24} />
+                            {fileInfo[note.id] ? getFileIcon(fileInfo[note.id]) : <FileText className="text-purple-700" size={24} />}
                           </div>
                           <div>
                             <h4 className="font-semibold text-gray-900">{note.title}</h4>

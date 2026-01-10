@@ -1,6 +1,7 @@
 import { Upload, FileText, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { apiService } from "../services/apiService";
+import type { Course } from "../services/apiService";
 import { useNavigate } from "react-router-dom";
 
 export default function AddNotes() {
@@ -8,16 +9,57 @@ export default function AddNotes() {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<globalThis.File | null>(null);
 
-  const [title, setTitle] = useState("");
   const [courseCode, setCourseCode] = useState("");
+  const [courseName, setCourseName] = useState("");
   const [summary, setSummary] = useState("");
 
   const [classLevel, setClassLevel] = useState<number>(1);
   const [semester, setSemester] = useState<number>(1);
 
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [error, setError] = useState("");
+
+  // Fetch courses when class level or semester changes
+  useEffect(() => {
+    const fetchCourses = async () => {
+      setLoadingCourses(true);
+      try {
+        const fetchedCourses = await apiService.courses.getByClassLevelAndSemester(
+          classLevel,
+          semester
+        );
+        setCourses(fetchedCourses);
+        // Reset course selection when class/semester changes
+        setCourseCode("");
+        setCourseName("");
+      } catch (err) {
+        console.error("Failed to fetch courses:", err);
+        setCourses([]);
+      } finally {
+        setLoadingCourses(false);
+      }
+    };
+
+    fetchCourses();
+  }, [classLevel, semester]);
+
+  // Handle course selection
+  const handleCourseChange = (selectedCourseCode: string) => {
+    setCourseCode(selectedCourseCode);
+
+    // Auto-fill course name if a course is selected
+    const selectedCourse = courses.find(c => c.courseCode === selectedCourseCode);
+    if (selectedCourse && selectedCourse.courseName) {
+      setCourseName(selectedCourse.courseName);
+    } else {
+      setCourseName("");
+    }
+  };
+
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -46,40 +88,53 @@ export default function AddNotes() {
   };
 
   const handleFile = (file: globalThis.File) => {
-    // Check file size
-    if (file.size > 50 * 1024 * 1024) {
-      setError("File size cannot exceed 50MB");
+    // Reset previous errors
+    setError("");
+
+    // Check file size (50MB limit)
+    const maxSize = 50 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setError(`❌ File size cannot exceed 50MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      setSelectedFile(null);
       return;
     }
 
-    // Check file type
+    // Strict file type validation - ONLY allow PDF, DOCX, JPEG/JPG
     const allowedExtensions = ['.pdf', '.docx', '.jpeg', '.jpg'];
     const fileName = file.name.toLowerCase();
-    const isAllowed = allowedExtensions.some(ext => fileName.endsWith(ext));
+    const fileExtension = '.' + fileName.split('.').pop();
+
+    const isAllowed = allowedExtensions.includes(fileExtension);
 
     if (!isAllowed) {
-      setError("Only .pdf, .docx, and .jpeg files are allowed");
+      setError(`❌ Invalid file type! Only PDF, DOCX, and JPEG files are allowed. You uploaded: ${fileExtension.toUpperCase()}`);
+      setSelectedFile(null);
+      // Show alert for extra emphasis
+      alert(`⚠️ File Upload Blocked!\n\nOnly the following file types are allowed:\n• PDF (.pdf)\n• Word Document (.docx)\n• JPEG Image (.jpeg, .jpg)\n\nYou tried to upload: ${fileExtension.toUpperCase()}\n\nPlease select a valid file.`);
       return;
     }
 
+    // File is valid
     setSelectedFile(file);
     setError("");
-    if (!title) {
-      setTitle(file.name.replace(/\.[^/.]+$/, ""));
+
+    // Auto-populate course name from filename if not already set
+    if (!courseName) {
+      setCourseName(file.name.replace(/\.[^/.]+$/, ""));
     }
   };
 
   const removeFile = () => {
     setSelectedFile(null);
-    setTitle("");
     setCourseCode("");
+    setCourseName("");
     setSummary("");
     setError("");
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !title) {
-      setError("Please fill in the file and title fields!");
+    if (!selectedFile || !courseCode || !courseName) {
+      setError("Please fill in the file, course code, and course name fields!");
       return;
     }
 
@@ -87,10 +142,10 @@ export default function AddNotes() {
     setError("");
 
     try {
-      // CREATE NOTE
+      // CREATE NOTE - use courseName as title
       const note = await apiService.notes.create({
-        title,
-        courseCode: courseCode || undefined,
+        title: courseName,
+        courseCode: courseCode,
         summary: summary || undefined,
         classLevel,
         semester,
@@ -108,8 +163,8 @@ export default function AddNotes() {
 
       setTimeout(() => {
         setSelectedFile(null);
-        setTitle("");
         setCourseCode("");
+        setCourseName("");
         setSummary("");
         setUploadSuccess(false);
         navigate("/shared-notes");
@@ -121,7 +176,7 @@ export default function AddNotes() {
     }
   };
 
-  const isFormValid = selectedFile && title;
+  const isFormValid = selectedFile && courseCode && courseName;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -141,10 +196,13 @@ export default function AddNotes() {
           {/* DOSYA */}
           <div className="mb-8">
             <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Upload File
+              Upload File *
             </label>
             <p className="text-xs text-gray-500 mb-2">
-              📎 Allowed file types: <span className="font-medium text-purple-600">.pdf, .docx, .jpeg</span>
+              📎 <span className="font-bold text-purple-700">ONLY</span> allowed file types: <span className="font-medium text-purple-600">.pdf, .docx, .jpeg/.jpg</span>
+            </p>
+            <p className="text-xs text-red-600 mb-2 font-medium">
+              ⚠️ Other file types will be rejected
             </p>
 
             <div
@@ -162,7 +220,7 @@ export default function AddNotes() {
                 id="file-upload"
                 className="hidden"
                 onChange={handleFileInput}
-                accept=".pdf,.docx,.jpeg,.jpg"
+                accept=".pdf,.docx,image/jpeg,image/jpg"
               />
 
               {!selectedFile ? (
@@ -208,52 +266,90 @@ export default function AddNotes() {
           {/* FORM */}
           {selectedFile && (
             <div className="space-y-6 mb-8">
-              {/* Başlık */}
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Note Title"
-                className="w-full px-4 py-3 border rounded-lg"
-              />
+              {/* CLASS LEVEL */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Class Level
+                </label>
+                <select
+                  value={classLevel}
+                  onChange={(e) => setClassLevel(Number(e.target.value))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value={1}>1st Year</option>
+                  <option value={2}>2nd Year</option>
+                  <option value={3}>3rd Year</option>
+                  <option value={4}>4th Year</option>
+                </select>
+              </div>
 
-              {/* Ders Kodu */}
-              <input
-                value={courseCode}
-                onChange={(e) => setCourseCode(e.target.value)}
-                placeholder="Course Code (Optional)"
-                className="w-full px-4 py-3 border rounded-lg"
-              />
+              {/* SEMESTER */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Semester
+                </label>
+                <select
+                  value={semester}
+                  onChange={(e) => setSemester(Number(e.target.value))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value={1}>Fall</option>
+                  <option value={2}>Spring</option>
+                </select>
+              </div>
 
-              {/* SINIF */}
-              <select
-                value={classLevel}
-                onChange={(e) => setClassLevel(Number(e.target.value))}
-                className="w-full px-4 py-3 border rounded-lg"
-              >
-                <option value={1}>1st Year</option>
-                <option value={2}>2nd Year</option>
-                <option value={3}>3rd Year</option>
-                <option value={4}>4th Year</option>
-              </select>
+              {/* COURSE CODE - REQUIRED */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Course Code *
+                </label>
+                {loadingCourses ? (
+                  <div className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                    Loading courses...
+                  </div>
+                ) : (
+                  <select
+                    value={courseCode}
+                    onChange={(e) => handleCourseChange(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="">Select a course</option>
+                    {courses.map((course) => (
+                      <option key={course.id} value={course.courseCode}>
+                        {course.courseCode}
+                        {course.isElective && " (Elective)"}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
-              {/*DÖNEM */}
-              <select
-                value={semester}
-                onChange={(e) => setSemester(Number(e.target.value))}
-                className="w-full px-4 py-3 border rounded-lg"
-              >
-                <option value={1}>Fall</option>
-                <option value={2}>Spring</option>
-              </select>
+              {/* COURSE NAME - REQUIRED (replaces Note Title) */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Course Name *
+                </label>
+                <input
+                  value={courseName}
+                  onChange={(e) => setCourseName(e.target.value)}
+                  placeholder="Enter course name"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
 
-              {/* Özet */}
-              <textarea
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                placeholder="Note Summary"
-                rows={4}
-                className="w-full px-4 py-3 border rounded-lg"
-              />
+              {/* SUMMARY */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  placeholder="Add a description for your note (optional)"
+                  rows={4}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                />
+              </div>
             </div>
           )}
 
